@@ -1,0 +1,16 @@
+.vscode
+.python-version
+__pycache__
+jobs/
+
+*log
+venv
+*.egg-info
+comparison*
+
+*.png
+images
+toy*
+dev*
+
+*copy*
