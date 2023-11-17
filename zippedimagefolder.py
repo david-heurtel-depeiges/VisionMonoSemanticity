@@ -8,7 +8,12 @@ from zipfile import Path, ZipFile
 import json
 from io import BytesIO
 
-from PIL import Image
+import cv2
+import numpy as np
+
+
+from PIL import Image, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 #########################################################################
 ## Code copied from Geraud Krawezik from SCC @ Flatiron Institute, NYC ##
@@ -54,7 +59,12 @@ class ZippedDatasetFolder(DatasetFolder):
             self.zipped_file = open(self.root, 'rb')
         self.zipped_file.seek(path[0])
         dataEnc = self.zipped_file.read(path[1])
-        img = Image.open(BytesIO(dataEnc))
+
+        img = cv2.imdecode(np.frombuffer(dataEnc, np.uint8), 1)
+        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+
+        return img
+        img = Image.open(BytesIO(dataEnc), format='JPEG')
         return img.convert("RGB")
 
     @staticmethod
