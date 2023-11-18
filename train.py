@@ -1,46 +1,18 @@
 import torch
 import os
-import json
-import zipfile
-import gzip
-import matplotlib.pyplot as plt
-from PIL import Image
-import torchvision 
 from torchvision import transforms
-from torch.utils.data import Dataset, DataLoader
-from nltk.corpus import wordnet as wn
-import pandas as pd
-import numpy as np
 import wandb
-import tqdm
-import torch.nn.functional as F
 
-import argparse
+from argparse import ArgumentParser
 import os
-import random
-import shutil
-import time
-import warnings
-from enum import Enum
-#from zipfile import ZipFile
-
-from zippedimagefolder import ZippedDatasetFolder
-import zippedimagefolder
 
 import torch
-import torch.backends.cudnn as cudnn
-import torch.distributed as dist
-import torch.multiprocessing as mp
-import torch.nn as nn
 import torch.nn.parallel
 import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.datasets as datasets
-import torchvision.models as models
 import torchvision.transforms as transforms
-from torch.optim.lr_scheduler import StepLR
-from torch.utils.data import Subset
 import pytorch_lightning as pl
 
 from model import DictionnaryLearner
@@ -55,30 +27,30 @@ def maybe_None_or_int(arg):
     else:
         raise ValueError('arg must be a string or an int')
 
-args = argparse.ArgumentParser(description='InceptionV1 monosemantic feature learning')
-args.add_argument('--dataset', default='imagenet', type=str, help='dataset to use')
-args.add_argument('--model_to_hook', default='inceptionv1', type=str, help='model to hook')
-args.add_argument('--layer_name', default='mixed4a', type=str, help='layer to hook')
-args.add_argument('--patch_size', default=None, type=maybe_None_or_int, help='patch size')
-args.add_argument('--batch_size', default=512, type=int, help='batch size')
-args.add_argument('--channels', default = 508, type=int, help='number of channels')
-args.add_argument('--hidden_size', default = 10 * 508, type=int, help='hidden size')
-args.add_argument('--l1_coeff', default = 1e-2, type=float, help='l1 coefficient')
-args.add_argument('--lr', default = 1e-3, type=float, help='learning rate')
-args.add_argument('--seed', default = 0, type=int, help='seed')
-args.add_argument('--max_epochs', default = 100, type=int, help='max epochs')
-args.add_argument('--gpus', default = 1, type=int, help='number of gpus')
-args.add_argument('--optimizer', default = 'Adam', type=str, help='optimizer')
-args.add_argument('--num_workers', default = 8, type=int, help='number of workers')
-args.add_argument('--resume_from_checkpoint', default = None, type=str, help='resume from checkpoint')
-args.add_argument('--save_top_k', default = 1, type=int, help='save top k')
-args.add_argument('--save_path', default = '/mnt/home/dheurtel/ceph/02_checkpoints/monosemantic/', type=str, help='save path')
-args.add_argument('--wandb_project', default = 'monosemantic_dictionnary_learning', type=str, help='wandb project')
-args.add_argument('--model_name', default = 'inceptionv1_mixed4a_monosemantic', type=str, help='model name')
-args.add_argument('--logger', default = 'wandb', type=str, help='logger')
+parser = ArgumentParser(description='InceptionV1 monosemantic feature learning')
+parser.add_argument('--dataset', default='imagenet', type=str, help='dataset to use')
+parser.add_argument('--model_to_hook', default='inceptionv1', type=str, help='model to hook')
+parser.add_argument('--layer_name', default='mixed4a', type=str, help='layer to hook')
+parser.add_argument('--patch_size', default=None, type=maybe_None_or_int, help='patch size')
+parser.add_argument('--batch_size', default=512, type=int, help='batch size')
+parser.add_argument('--channels', default = 508, type=int, help='number of channels')
+parser.add_argument('--hidden_size', default = 10 * 508, type=int, help='hidden size')
+parser.add_argument('--l1_coeff', default = 1e-2, type=float, help='l1 coefficient')
+parser.add_argument('--lr', default = 1e-3, type=float, help='learning rate')
+parser.add_argument('--seed', default = 0, type=int, help='seed')
+parser.add_argument('--max_epochs', default = 100, type=int, help='max epochs')
+parser.add_argument('--gpus', default = 1, type=int, help='number of gpus')
+parser.add_argument('--optimizer', default = 'Adam', type=str, help='optimizer')
+parser.add_argument('--num_workers', default = 8, type=int, help='number of workers')
+parser.add_argument('--resume_from_checkpoint', default = None, type=str, help='resume from checkpoint')
+parser.add_argument('--save_top_k', default = 1, type=int, help='save top k')
+parser.add_argument('--save_path', default = '/mnt/home/dheurtel/ceph/02_checkpoints/monosemantic/', type=str, help='save path')
+parser.add_argument('--wandb_project', default = 'monosemantic_dictionnary_learning', type=str, help='wandb project')
+parser.add_argument('--model_name', default = 'inceptionv1_mixed4a_monosemantic', type=str, help='model name')
+parser.add_argument('--logger', default = 'wandb', type=str, help='logger')
 
 
-args.parse_args()
+args = parser.parse_args()
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -93,7 +65,11 @@ if args.dataset == 'imagenet':
         if len(l)==0:
             dirnotempy = False
     if not dirnotempy:
+        print('Downloading imagenet from ceph and unzipping it')
         os.system('bash dataload.sh')
+        print('Done')
+
+    print('Building datasets and dataloaders')
     TRAIN_DIR = '/tmp/imagenet/train/'
     TEST_DIR = '/tmp/imagenet/train/'
 
@@ -125,11 +101,13 @@ if args.dataset == 'imagenet':
             transforms.ToTensor(),
             normalize,
         ]))    
+    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+    print('Done')
 else: 
     raise NotImplementedError
 
-train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
-val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+
 
 dict_learner = DictionnaryLearner(args.hidden_size, 
                                   args.channels, 
