@@ -8,6 +8,8 @@ import os
 import pytorch_lightning as pl
 from lucent.modelzoo import inceptionv1
 
+## Credit to Neel Nanda for the 1L Sparse Autoencoder implementation
+
 class AutoEncoder(nn.Module):
     def __init__(self, d_hidden, d_input, l1_coeff, device = None, seed = None):
         super(AutoEncoder, self).__init__()
@@ -84,6 +86,14 @@ class AutoEncoder(nn.Module):
         self = cls(config)
         self.load_state_dict(torch.load(config['save_path'] + '.pt'))
         return self
+    
+    def reinit_neurons(self, indices):
+        new_W_enc = torch.nn.init.kaiming_uniform_(torch.zeros_like(self.W_enc))
+        new_W_dec = torch.nn.init.kaiming_uniform_(torch.zeros_like(self.W_dec))
+        new_b_enc = torch.zeros_like(self.b_enc)
+        self.W_enc.data[:, indices] = new_W_enc[:, indices]
+        self.W_dec.data[indices, :] = new_W_dec[indices, :]
+        self.b_enc.data[indices] = new_b_enc[indices]
 
 def reshape_patches(x, patch_size):
     if patch_size is None:
@@ -136,22 +146,38 @@ class DictionnaryLearner(pl.LightningModule):
         self.autoencoder = AutoEncoder(d_hidden, d_input, l1_coeff, device, seed)
         if 'patch_size' in kwargs:
             self.patch_size = kwargs['patch_size']
-        self.hookedmodel = HookedModel(default_model, default_model.mixed4a, patch_size = self.patch_size)
+        model = default_model ## For now, only inceptionv1 is supported
+        layer_to_hook = getattr(model, layer_to_hook)
+        self.hookedmodel = HookedModel(model, layer_to_hook, patch_size = self.patch_size)
         for param in self.hookedmodel.parameters():
             param.requires_grad = False
         self.save_hyperparameters()
         for key, value in kwargs.items():
             setattr(self, key, value)
+        self.epoch = -1 ## Take into account the first validation sanity check of pytorch lightning
+        self.freqs = torch.zeros(d_hidden).to(device)
+        self.len_dataloader = 0
     def forward(self, x):
-        return self.autoencoder(x)
+        activations = self.hookedmodel(x)
+        return self.autoencoder(activations)
+    
     def training_step(self, batch, batch_idx):
+        opts = self.optimizers()
         x, _ = batch
         activations = self.hookedmodel(x)
-        loss, _,_, l2_loss, l1_loss = self.autoencoder(activations)
+        loss, _,acts, l2_loss, l1_loss = self.autoencoder(activations)
         self.log('train_loss', loss)
         self.log('train_l2_loss', l2_loss)
         self.log('train_l1_loss', l1_loss)
-        return loss
+        loss.backward()
+        self.autoencoder.make_decoder_weights_and_grad_unit_norm()
+        opts.step()
+        opts.zero_grad()
+        ## Memorize whether or not neurons are active, compute for each neuron the number of times it was active, ie the number of times it was greater than 0
+        freqs = (acts > 0).sum(dim=0)/acts.shape[0]
+        self.freqs += freqs
+        self.len_dataloader += 1
+
     def validation_step(self, batch, batch_idx):
         x, _ = batch
         activations = self.hookedmodel(x)
@@ -160,6 +186,21 @@ class DictionnaryLearner(pl.LightningModule):
         self.log('val_l2_loss', l2_loss)
         self.log('val_l1_loss', l1_loss)
         return loss
+    
+    def on_validation_epoch_end(self):
+        self.epoch += 1
+        ## If self.epoch is a multiple of 5, reset the neurons with frequency lower than 1e-5
+        if self.epoch % 5 == 0 and self.epoch > 0:
+            self.freqs /= self.len_dataloader * 5
+            dead_neurons = (self.freqs == 0).sum()
+            below_1e_5 = (self.freqs < 1e-5).sum()
+            self.log('dead_neurons', dead_neurons)
+            self.log('below_1e_5', below_1e_5)
+            ## Reset every neuron with frequency lower than 1e-5
+            to_reinit = (self.freqs < 1e-5).nonzero().squeeze(-1)
+            self.autoencoder.reinit_neurons(to_reinit)
+            self.freqs = torch.zeros_like(self.freqs)
+            self.len_dataloader = 0
     def configure_optimizers(self):
         if hasattr(self, 'lr'):
             lr = self.lr
@@ -178,3 +219,4 @@ class DictionnaryLearner(pl.LightningModule):
                     raise ValueError('optimizer must be a string or a torch.optim.Optimizer or None')
         else:
             return torch.optim.Adam(self.parameters(), lr=lr)
+    

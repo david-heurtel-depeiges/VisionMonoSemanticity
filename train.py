@@ -44,7 +44,7 @@ parser.add_argument('--optimizer', default = 'Adam', type=str, help='optimizer')
 parser.add_argument('--num_workers', default = 8, type=int, help='number of workers')
 parser.add_argument('--resume_from_checkpoint', default = None, type=str, help='resume from checkpoint')
 parser.add_argument('--save_top_k', default = 1, type=int, help='save top k')
-parser.add_argument('--save_path', default = '/mnt/home/dheurtel/ceph/02_checkpoints/monosemantic/', type=str, help='save path')
+parser.add_argument('--save_path', default = '/mnt/home/dheurtel/ceph/02_checkpoints/', type=str, help='save path')
 parser.add_argument('--wandb_project', default = 'monosemantic_dictionnary_learning', type=str, help='wandb project')
 parser.add_argument('--model_name', default = 'inceptionv1_mixed4a_monosemantic', type=str, help='model name')
 parser.add_argument('--logger', default = 'wandb', type=str, help='logger')
@@ -114,7 +114,7 @@ dict_learner = DictionnaryLearner(args.hidden_size,
                                   args.l1_coeff, 
                                   args.seed, 
                                   model_to_hook=args.model_to_hook, 
-                                  layer_name=args.layer_name, 
+                                  layer_to_hook=args.layer_name, 
                                   patch_size=args.patch_size, 
                                   lr=args.lr,
                                   optimizer=args.optimizer,
@@ -125,7 +125,6 @@ dict_learner = DictionnaryLearner(args.hidden_size,
                                   num_workers=args.num_workers,
                                   batch_size=args.batch_size,
                                   resume_from_checkpoint=args.resume_from_checkpoint,
-                                  save_top_k=args.save_top_k,
                                   wandb_project=args.wandb_project)
 
 logger_type = args.logger
@@ -134,16 +133,15 @@ if logger_type == 'wandb':
     logger = pl.loggers.WandbLogger(project=args.wandb_project, name=args.model_name)
     logger.watch(dict_learner)
     logger.log_hyperparams(CONFIG)
-    default_root_dir = None
+    default_root_dir = os.path.join(args.save_path)
 elif logger_type == 'tensorboard':
     logger = pl.loggers.TensorBoardLogger(args.save_path, name=args.model_name)
     default_root_dir = None
 elif logger_type == 'None':
     logger = None
-    default_root_dir = args.save_path
+    default_root_dir = os.path.join(args.save_path, args.model_name)
 
-
-trainer = pl.Trainer(gpus=args.gpus,max_epoch = args.max_epochs, logger=logger, default_root_dir=default_root_dir, resume_from_checkpoint=args.resume_from_checkpoint, save_top_k=args.save_top_k)
+trainer = pl.Trainer(gpus=args.gpus,max_epochs = args.max_epochs, logger=logger, default_root_dir=default_root_dir, resume_from_checkpoint=args.resume_from_checkpoint)
 trainer.fit(dict_learner, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
 if logger_type == 'wandb':

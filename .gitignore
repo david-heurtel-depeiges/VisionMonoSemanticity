@@ -16,3 +16,6 @@ dev*
 *copy*
 
 secrets*
+wandb
+slurm*
+artifacts*
