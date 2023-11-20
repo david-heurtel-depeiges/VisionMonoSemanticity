@@ -88,6 +88,7 @@ class AutoEncoder(nn.Module):
         return self
     
     def reinit_neurons(self, indices):
+        indices = indices.to(self.W_enc.device)
         new_W_enc = torch.nn.init.kaiming_uniform_(torch.zeros_like(self.W_enc))
         new_W_dec = torch.nn.init.kaiming_uniform_(torch.zeros_like(self.W_dec))
         new_b_enc = torch.zeros_like(self.b_enc)
@@ -175,7 +176,7 @@ class DictionnaryLearner(pl.LightningModule):
         opts.zero_grad()
         ## Memorize whether or not neurons are active, compute for each neuron the number of times it was active, ie the number of times it was greater than 0
         freqs = (acts > 0).sum(dim=0)/acts.shape[0]
-        self.freqs += freqs
+        self.freqs += freqs.to(self.freqs.device)
         self.len_dataloader += 1
 
     def validation_step(self, batch, batch_idx):
