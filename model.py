@@ -194,11 +194,11 @@ class DictionnaryLearner(pl.LightningModule):
         if self.epoch % 5 == 0 and self.epoch > 0:
             self.freqs /= self.len_dataloader * 5
             dead_neurons = (self.freqs == 0).sum()
-            below_1e_5 = (self.freqs < 1e-5).sum()
-            self.log('dead_neurons', dead_neurons)
-            self.log('below_1e_5', below_1e_5)
+            below_1e_6 = (self.freqs < 1e-6).sum()
+            self.log('dead_neurons', dead_neurons) 
+            self.log('below_1e_6', below_1e_6)           
             ## Reset every neuron with frequency lower than 1e-5
-            to_reinit = (self.freqs < 1e-5).nonzero().squeeze(-1)
+            to_reinit = (self.freqs < 1e-6).nonzero().squeeze(-1)
             self.autoencoder.reinit_neurons(to_reinit)
             self.freqs = torch.zeros_like(self.freqs)
             self.len_dataloader = 0
