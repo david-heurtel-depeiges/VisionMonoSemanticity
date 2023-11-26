@@ -19,3 +19,5 @@ secrets*
 wandb
 slurm*
 artifacts*
+
+*.sh
