@@ -2,6 +2,7 @@ import torch
 import os
 from torchvision import transforms
 import wandb
+import time
 
 from argparse import ArgumentParser
 import os
@@ -59,15 +60,34 @@ os.makedirs(args.save_path, exist_ok=True)
 CONFIG = vars(args)
 
 if args.dataset == 'imagenet':
-    dirnotempy = os.path.exists('/tmp/imagenet/train')
-    if dirnotempy:
-        l = os.listdir('/tmp/imagenet/train')
-        if len(l)==0:
-            dirnotempy = False
-    if not dirnotempy:
+    ## 1st tries to make a /tmp/imagenet/ folder.
+    ## If it exists, waits for it to be complete (another job on the node is downloading it)
+
+    direxists = os.path.exists('/tmp/imagenet/')
+
+    if not direxists:
         print('Downloading imagenet from ceph and unzipping it')
         os.system('bash dataload.sh')
         print('Done')
+    else:
+        print('Waiting for imagenet to be downloaded')
+        while not os.path.exists('/tmp/imagenet/val'):
+            time.sleep(120)
+        n_classes_val = len(os.listdir('/tmp/imagenet/val'))
+        while n_classes_val < 1000:
+            time.sleep(120)
+            n_classes_val = len(os.listdir('/tmp/imagenet/val'))
+        print('Imagenet downloaded by another job')
+    
+    # dirnotempy = os.path.exists('/tmp/imagenet/train')
+    # if dirnotempy:
+    #     l = os.listdir('/tmp/imagenet/train')
+    #     if len(l)==0:
+    #         dirnotempy = False
+    # if not dirnotempy:
+    #     print('Downloading imagenet from ceph and unzipping it')
+    #     os.system('bash dataload.sh')
+    #     print('Done')
 
     print('Building datasets and dataloaders')
     TRAIN_DIR = '/tmp/imagenet/train/'
