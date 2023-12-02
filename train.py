@@ -168,7 +168,7 @@ elif logger_type == 'None':
     logger = None
     default_root_dir = os.path.join(args.save_path, args.model_name)
 
-trainer = pl.Trainer(gpus=args.gpus,max_epochs = args.max_epochs, logger=logger, default_root_dir=default_root_dir, resume_from_checkpoint=args.resume_from_checkpoint)
+trainer = pl.Trainer(max_epochs = args.max_epochs, logger=logger, default_root_dir=default_root_dir)#devices=args.gpus
 trainer.fit(dict_learner, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
 if logger_type == 'wandb':
