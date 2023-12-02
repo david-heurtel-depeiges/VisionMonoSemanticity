@@ -73,10 +73,12 @@ if args.dataset == 'imagenet':
         print('Waiting for imagenet to be downloaded')
         while not os.path.exists('/tmp/imagenet/val'):
             time.sleep(120)
+            print('Waiting for imagenet to be downloaded for 2 minutes')
         n_classes_val = len(os.listdir('/tmp/imagenet/val'))
         while n_classes_val < 1000:
             time.sleep(120)
             n_classes_val = len(os.listdir('/tmp/imagenet/val'))
+            print('Waiting for imagenet to be downloaded for 2 minutes')
         print('Imagenet downloaded by another job')
     
     # dirnotempy = os.path.exists('/tmp/imagenet/train')
