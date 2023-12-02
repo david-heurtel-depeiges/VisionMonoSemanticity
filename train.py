@@ -63,9 +63,14 @@ if args.dataset == 'imagenet':
     ## 1st tries to make a /tmp/imagenet/ folder.
     ## If it exists, waits for it to be complete (another job on the node is downloading it)
 
+    ## Waits for a random amount of time to avoid all jobs downloading at the same time
+    ## Should use ddp with rank 0... but right now jobs are not launched with ddp/submitted individually
+    print('Waiting for a random amount of time to avoid all jobs downloading at the same time')
+    time.sleep(120* torch.rand(1).item())
     direxists = os.path.exists('/tmp/imagenet/')
 
     if not direxists:
+        os.makedirs('/tmp/imagenet/') ## Will block other jobs from downloading imagenet on the same node
         print('Downloading imagenet from ceph and unzipping it')
         os.system('bash dataload.sh')
         print('Done')
