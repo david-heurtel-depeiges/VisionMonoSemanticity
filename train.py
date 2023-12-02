@@ -67,10 +67,10 @@ if args.dataset == 'imagenet':
     ## Should use ddp with rank 0... but right now jobs are not launched with ddp/submitted individually
     print('Waiting for a random amount of time to avoid all jobs downloading at the same time')
     time.sleep(120* torch.rand(1).item())
-    direxists = os.path.exists('/tmp/imagenet/')
+    direxists = os.path.exists('/tmp/blocking')
 
     if not direxists:
-        os.makedirs('/tmp/imagenet/') ## Will block other jobs from downloading imagenet on the same node
+        os.makedirs('/tmp/blocking') ## Will block other jobs from downloading imagenet on the same node
         print('Downloading imagenet from ceph and unzipping it')
         os.system('bash dataload.sh')
         print('Done')
