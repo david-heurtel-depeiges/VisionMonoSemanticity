@@ -154,7 +154,10 @@ class DictionnaryLearner(pl.LightningModule):
             param.requires_grad = False
         self.save_hyperparameters()
         for key, value in kwargs.items():
-            setattr(self, key, value)
+            try:
+                setattr(self, key, value)
+            except:
+                pass
         self.epoch = -1 ## Take into account the first validation sanity check of pytorch lightning
         self.freqs = torch.zeros(d_hidden).to(device)
         self.len_dataloader = 0
