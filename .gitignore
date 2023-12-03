@@ -21,8 +21,8 @@ slurm*
 artifacts*
 
 *.sh
-.pdf
+*.pdf
 
-.md
+report.md
 
 figures
