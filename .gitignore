@@ -17,7 +17,6 @@ dev*
 
 secrets*
 wandb
-slurm*
 artifacts*
 
 *.sh
