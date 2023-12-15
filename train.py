@@ -45,7 +45,7 @@ parser.add_argument('--optimizer', default = 'Adam', type=str, help='optimizer')
 parser.add_argument('--num_workers', default = 8, type=int, help='number of workers')
 parser.add_argument('--resume_from_checkpoint', default = None, type=str, help='resume from checkpoint')
 parser.add_argument('--save_top_k', default = 1, type=int, help='save top k')
-parser.add_argument('--save_path', default = '/mnt/home/dheurtel/ceph/02_checkpoints/', type=str, help='save path')
+parser.add_argument('--save_path', default = '/path/to/checkpoints', type=str, help='save path')
 parser.add_argument('--wandb_project', default = 'monosemantic_dictionnary_learning', type=str, help='wandb project')
 parser.add_argument('--model_name', default = 'inceptionv1_mixed4a_monosemantic', type=str, help='model name')
 parser.add_argument('--logger', default = 'wandb', type=str, help='logger')
@@ -60,48 +60,13 @@ os.makedirs(args.save_path, exist_ok=True)
 CONFIG = vars(args)
 
 if args.dataset == 'imagenet':
-    ## 1st tries to make a /tmp/imagenet/ folder.
-    ## If it exists, waits for it to be complete (another job on the node is downloading it)
-
-    ## Waits for a random amount of time to avoid all jobs downloading at the same time
-    ## Should use ddp with rank 0... but right now jobs are not launched with ddp/submitted individually
-    print('Waiting for a random amount of time to avoid all jobs downloading at the same time')
-    time.sleep(120* torch.rand(1).item())
-    direxists = os.path.exists('/tmp/blocking')
-
-    if not direxists:
-        os.makedirs('/tmp/blocking') ## Will block other jobs from downloading imagenet on the same node
-        print('Downloading imagenet from ceph and unzipping it')
-        os.system('bash dataload.sh')
-        print('Done')
-    else:
-        print('Waiting for imagenet to be downloaded')
-        while not os.path.exists('/tmp/imagenet/val'):
-            time.sleep(120)
-            print('Waiting for imagenet to be downloaded for 2 minutes')
-        n_classes_val = len(os.listdir('/tmp/imagenet/val'))
-        while n_classes_val < 1000:
-            time.sleep(120)
-            n_classes_val = len(os.listdir('/tmp/imagenet/val'))
-            print('Waiting for imagenet to be downloaded for 2 minutes')
-        print('Imagenet downloaded by another job')
-    
-    # dirnotempy = os.path.exists('/tmp/imagenet/train')
-    # if dirnotempy:
-    #     l = os.listdir('/tmp/imagenet/train')
-    #     if len(l)==0:
-    #         dirnotempy = False
-    # if not dirnotempy:
-    #     print('Downloading imagenet from ceph and unzipping it')
-    #     os.system('bash dataload.sh')
-    #     print('Done')
-
+    print('Downloading Imagenet')
+    os.system('bash dataload.sh')
+    print('Done')
     print('Building datasets and dataloaders')
-    TRAIN_DIR = '/tmp/imagenet/train/'
-    TEST_DIR = '/tmp/imagenet/train/'
 
-    traindir = os.path.join('/tmp/imagenet/', 'train')
-    valdir = os.path.join('/tmp/imagenet/', 'val')
+    traindir = os.path.join('/path/to/imagenet/', 'train')
+    valdir = os.path.join('/path/to/imagenet/', 'val')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                         std=[0.229, 0.224, 0.225])
     def unormalize(batch):
